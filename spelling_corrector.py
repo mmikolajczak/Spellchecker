@@ -40,6 +40,7 @@ class SpellingCorrector:
         self._load_train_data()
         self._bigrams_dict = BigramsDict()
         self._generate_bigrams_and_words_set()
+        self._test_text = None
         self._test_sentences = None
 
 
@@ -51,12 +52,14 @@ class SpellingCorrector:
     filepath, specifies output destination in case of 'file' return mode
     '''
     #z zalozenia dzialamy wtedy gdy slowo nie wystepuje w slowniku
-    def correct(self, input_filename, output_mode='file', filepath='results.txt'):
+    def correct(self, input_filename, output_mode='', filepath='test_output/results.txt'):
         self._load_test_data(input_filename)
         corrected_words = []
         corrected_sentences = [] #nf
         for sentence in self._test_sentences: #ale interpunkcje to bym chcial zachowac
             #na razie bez uwzgledniania interpunkcji
+            # Update: chwilowo tracimy info o duzych literach, interpunkcja za to ogarnieta
+            orig = sentence.lower()
             sentence = get_words(sentence.lower())
             for i in range(0, len(sentence)):
                 if sentence[i] not in self._words_set:
@@ -66,9 +69,19 @@ class SpellingCorrector:
                     corrected_word = self._correct_word(sequence) #tu operacja na kopii, poprawic potem
                     print("Corrected {:s} to {:s}".format(sentence[i], corrected_word)) #chwilowo taki debug
                     corrected_words.append((sentence[i], corrected_word))
+                    orig = orig.replace(sentence[i], corrected_word)
 
+            orig = orig[0].upper() + orig[1:] #handling upper letter at sentence beginning
+            corrected_sentences.append(orig)
+
+        #dbg
+        #print(self._find_test_sentneces_after_areas())
+        #input()
+        corrected_sentences = self._add_after_areas(corrected_sentences)
         if self._create_report_file:
             self._generate_xml_report(corrected_words)
+        if output_mode == 'file':
+            self._save_corrected_text_to_file(corrected_sentences, filepath)
         if self._return_results:
             return corrected_words
         else:
@@ -96,6 +109,7 @@ class SpellingCorrector:
         test_data = ""
         path = os.path.join("test_data", filename)
         test_data += open(path, "r").read()
+        self._test_text = test_data
         self._test_sentences = self._split_text_to_sentences(test_data)
         self._test_sentences = [self._expand_shortcuts(sentence) for sentence in self._test_sentences]
         #print(self._test_sentences)
@@ -199,6 +213,44 @@ class SpellingCorrector:
         xml = minidom.parseString(xml_string)
         pretty_xml_as_string = xml.toprettyxml()
         open(path, 'w').write(pretty_xml_as_string)
+
+    def _find_test_sentneces_after_areas(self):
+        after_areas = []
+        for i in range(0, len(self._test_sentences)-1):
+            #print(self._test_sentences[i] + r'(\n|.)*?' + self._test_sentences[i+1]) #dbg
+            #print(self._test_text)
+            #input()
+            area = re.findall(r'(?<={}).*?(?={})'.format(re.escape(self._test_sentences[i]), re.escape(self._test_sentences[i+1])),
+                            self._test_text, re.MULTILINE | re.DOTALL)[0]
+            #area = re.match(self._test_sentences[i] + r'(\n|.)*?' + self._test_sentences[i+1], self._test_text, re.M)\
+            #    .group(1)
+            after_areas.append(area)
+        # case of last sentence in text
+        area = re.findall(r'(?<={}).*$'.format(re.escape(self._test_sentences[-1])), self._test_text,
+                          re.MULTILINE | re.DOTALL)[0]
+        after_areas.append(area)
+        #print(len(after_areas))
+        return after_areas
+
+    def _add_after_areas(self, correction_results):
+        after_areas = self._find_test_sentneces_after_areas()
+        for i in range(len(correction_results)):
+            correction_results[i] += after_areas[i]
+        return correction_results
+
+    def _save_corrected_text_to_file(self, correction_results, filepath):
+       # correction_results = self._add_after_areas(correction_results)
+        correction_results = sentences_list_to_text(correction_results)
+        with open(filepath, 'w') as f:
+            f.write(correction_results)
+
+
+def sentences_list_to_text(sentences):
+    text = ''
+    for sentence in sentences:
+        text += sentence
+    return text
+
 
 #error stats - dict
 def _visualize_errors_stats(error_stats):

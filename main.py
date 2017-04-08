@@ -10,6 +10,7 @@ def main():
     print(("", "i'm") in sp._bigrams_dict._bigrams)
     print("i'm" in sp._bigrams_dict._word_counts)
     results = sp.correct(test_data_filename)
+    results = sp.correct(test_data_filename, output_mode='file')
     benchmark_func(results)
 
 main()

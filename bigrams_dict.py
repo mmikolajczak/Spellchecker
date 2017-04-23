@@ -1,14 +1,19 @@
+# BigramsDict - class designed to store bigrams that occurred in text, maintain they count and
+# compute conditional probability of word occurrence based on words in its surroundings
+
 
 class BigramsDict:
 
     def __init__(self):
-        self._bigrams = {} #klucz - bigram, wartosc - ilosc wystapien
-        self._word_counts = {}
-        self._dummy_const = 0.0000001 #stala, w przypadku gdy jesden bigram nie istnieje,
-        #zapewnia ze w takim przypadku prawdopodobienstwo nie bedzie zrem ale obnizy tez wartosc na tyle by byla mniejsza
-        #od kazdego prawdopodobienstwa w przypadku dwoch bigramow
+        self._bigrams = {} # key - bigram, value - occurrences count
+        self._word_counts = {} # dict for occurrences of single words
+        self._dummy_const = 0.0000001 # const, that goal is to prevent multiplication by zero when counting
+        # probability but in the same time lowering it value to make sequences when both previous and next word
+        # matches score higher
 
     def insert(self, bigram):
+        # inserting bigram BigramsDict object
+        # TODO: maybe use Counter instead of handling that counts manually?
         if bigram is None:
             raise Exception("Empty bigram passed")
         bigram = tuple(bigram[i].lower() for i in range(0, len(bigram)))
@@ -17,13 +22,8 @@ class BigramsDict:
         else:
             self._bigrams[bigram] = 0
 
-        #dol bedzie dzialac bo w ramach treningu podajemy wszystkie bigramy
-        #nie zawsze musi byc poprzednie/nastepne - problem pustego
-        #prev_counts - ile razy przed podanym slowem cos bylo
-        #next_counts - ile razy po podanym slowie cos bylo
-        #ale to bedzie to samo bo dodajemy puste
-        #wiec moze byc zwykly word count
-
+        # "" - means end of sentence, it is added in earlier processing
+        # TODO: replace it with some constant to make it more readable?
         word = bigram[0]
         if word in self._word_counts:
             self._word_counts[word] += 1
@@ -32,8 +32,10 @@ class BigramsDict:
         if bigram[1] == "":
             self._word_counts[""] += 1
 
-    def get_prob(self, sequence): #sequence = tuple of three - prev_word, word, next_word
-        #zwracac iloczyn czy 'punkty' na podstawie sumy prawdopodobienstwa poprzedniego i nastepnego?
+    def get_prob(self, sequence):
+        # returns probability of passed sequence occurrence
+        # sequence = tuple of three - prev_word, word, next_word
+        # if both prev and next hasn't occurred earlier (in training) in word context then the returned prob is 0
         prev_context, next_context = (sequence[0], sequence[1]), (sequence[1], sequence[2])
         if prev_context in self._bigrams and next_context in self._bigrams:
             prev_word_prob = self._bigrams[prev_context] / self._word_counts[sequence[1]]
@@ -51,6 +53,7 @@ class BigramsDict:
             return 0.0
 
     def get_count(self, word):
-        #to w ogole nie powinno zajsc! zwykly ret powinien starczyc ale chwilowo praca nad czym innym wiec do zbadania potem
-        #return self._word_counts[word]
+        # returns count of total occurrences of word in train data
+        # TODO: there shouldn't be possibility for use get_count with word that hasn't occured earlier
+        # but it occurred once - investigate it
         return self._word_counts[word] if word in self._word_counts else 0
